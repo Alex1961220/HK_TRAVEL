@@ -292,7 +292,10 @@
               <input type="number" v-model.number="exchange.twd" @input="calcExchange('twd')" class="w-full text-center text-2xl font-bold bg-transparent border-b-2 border-primary/20 focus:outline-none focus:border-primary pb-1">
             </div>
           </div>
-          <p class="text-right text-xs text-text-light mt-2">參考匯率: 1 HKD = 4.07 TWD</p>
+          <p class="text-right text-xs text-text-light mt-2 flex items-center justify-end space-x-1">
+             <i class="fa-solid fa-circle-notch fa-spin text-primary" v-if="isFetchingRate"></i>
+             <span>即時參考匯率: 1 HKD = {{ currentRate.toFixed(2) }} TWD</span>
+          </p>
         </div>
 
         <!-- 緊急醫療與地圖 -->
@@ -683,11 +686,34 @@
 
         // 匯率
         const exchange = reactive({ hkd: 100, twd: 407 });
+        const currentRate = ref(4.07);
+        const isFetchingRate = ref(true);
+
         const calcExchange = (type) => {
-          const rate = 4.07;
+          const rate = currentRate.value;
           if(type === 'hkd') exchange.twd = Math.round(exchange.hkd * rate);
           else exchange.hkd = Number((exchange.twd / rate).toFixed(2));
         };
+
+        const fetchExchangeRate = async () => {
+          try {
+            // 使用公開的匯率 API 取得即時匯率 (因純前端無法直接跨域爬取銀行網頁)
+            const res = await fetch('https://api.exchangerate-api.com/v4/latest/HKD');
+            const data = await res.json();
+            if(data && data.rates && data.rates.TWD) {
+              currentRate.value = data.rates.TWD;
+              calcExchange('hkd'); // 更新預設顯示的 100 港幣對應台幣
+            }
+          } catch (err) {
+            console.error('匯率讀取失敗，使用預設匯率', err);
+          } finally {
+            isFetchingRate.value = false;
+          }
+        };
+
+        onMounted(() => {
+          fetchExchangeRate();
+        });
 
         // 購物清單
         const shoppingList = reactive([
@@ -824,7 +850,7 @@
 
         return {
           activeTab, tabs, dates, selectedDate, currentItineraries, 
-          mapFilter, filteredMapLocations, info, exchange, calcExchange,
+          mapFilter, filteredMapLocations, info, exchange, currentRate, isFetchingRate, calcExchange,
           shoppingList, expenses, totalExpenses, modals, modalData, fabClick,
           getCategoryIcon, getTransportIcon, getExpenseIcon, openNavigation,
           openEditModal, saveItinerary, openShoppingEditModal, saveShopping, handleImageUpload,
