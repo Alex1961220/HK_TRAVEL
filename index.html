@@ -570,7 +570,7 @@
   </div>
 
   <script>
-    const { createApp, ref, computed, reactive, onMounted } = Vue;
+    const { createApp, ref, computed, reactive, onMounted, watch } = Vue;
 
     createApp({
       components: {
@@ -597,8 +597,8 @@
         ];
         const selectedDate = ref('2026-06-17');
 
-        // 行程資料 (預先塞入你的香港行程)
-        const allItineraries = reactive({
+        // 預設行程資料
+        const defaultItineraries = {
           '2026-06-17': [
             { id: 1, type: 'flight', name: '抵達香港', flightOut: { deptTime: '14:35', deptAirport: 'TPE', arrTime: '16:35', arrAirport: 'HKG', duration: '2h', flightNo: '中華航空 CI915' }, transportType: 'transit', transitTime: '' },
             { id: 2, type: '住宿', name: '富豪機場酒店', time: '17:30 Check-in', note: '辦理入住，放下行李輕鬆出門', transportType: 'walk', transitTime: '5分' },
@@ -622,7 +622,39 @@
             { id: 12, type: '住宿', name: '退房前往九龍站', time: '08:30', note: '搭乘計程車直達九龍站，轉乘機場快線', transportType: 'car', transitTime: '15分' },
             { id: 13, type: 'flight', name: '返回台灣', flightOut: { deptTime: '11:05', deptAirport: 'HKG', arrTime: '13:00', arrAirport: 'TPE', duration: '1h 55m', flightNo: '長榮航空 BR852' }, transportType: 'transit', transitTime: '30分 (機場快線)' }
           ]
-        });
+        };
+
+        const defaultShopping = [
+          { id: 1, name: '嘗琉珍杏仁酥', img: '' },
+          { id: 2, name: 'Bakehouse 蛋撻', img: '' }
+        ];
+
+        const defaultExpenses = [
+          { id: 1, date: '2026-06-17', category: '交通', name: '八達通儲值', amount: 200, method: '現金', note: '' },
+          { id: 2, date: '2026-06-18', category: '門票', name: '迪士尼午晚套票', amount: 800, method: '信用卡', note: 'Klook 預訂' }
+        ];
+
+        // 初始化資料：先嘗試從 localStorage 讀取，沒有的話才用預設資料
+        const savedItineraries = JSON.parse(localStorage.getItem('hk_itineraries'));
+        const savedShopping = JSON.parse(localStorage.getItem('hk_shopping'));
+        const savedExpenses = JSON.parse(localStorage.getItem('hk_expenses'));
+
+        const allItineraries = reactive(savedItineraries || defaultItineraries);
+        const shoppingList = reactive(savedShopping || defaultShopping);
+        const expenses = reactive(savedExpenses || defaultExpenses);
+
+        // 使用 watch 自動儲存更動到 localStorage
+        watch(allItineraries, (newVal) => {
+          localStorage.setItem('hk_itineraries', JSON.stringify(newVal));
+        }, { deep: true });
+
+        watch(shoppingList, (newVal) => {
+          localStorage.setItem('hk_shopping', JSON.stringify(newVal));
+        }, { deep: true });
+
+        watch(expenses, (newVal) => {
+          localStorage.setItem('hk_expenses', JSON.stringify(newVal));
+        }, { deep: true });
 
         const currentItineraries = computed({
           get: () => allItineraries[selectedDate.value] || [],
@@ -715,17 +747,6 @@
           fetchExchangeRate();
         });
 
-        // 購物清單
-        const shoppingList = reactive([
-          { id: 1, name: '嘗琉珍杏仁酥', img: '' },
-          { id: 2, name: 'Bakehouse 蛋撻', img: '' }
-        ]);
-
-        // 花費
-        const expenses = reactive([
-          { id: 1, date: '2026-06-17', category: '交通', name: '八達通儲值', amount: 200, method: '現金', note: '' },
-          { id: 2, date: '2026-06-18', category: '門票', name: '迪士尼午晚套票', amount: 800, method: '信用卡', note: 'Klook 預訂' }
-        ]);
         const totalExpenses = computed(() => expenses.reduce((sum, e) => sum + Number(e.amount), 0));
 
         // 彈出視窗狀態與共用資料
