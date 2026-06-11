@@ -103,18 +103,18 @@
       <!-- ================= 每日行程表 ================= -->
       <section v-show="activeTab === 'itinerary'">
         
-        <!-- 天氣資訊 -->
+        <!-- 天氣資訊 (即時串接) -->
         <div class="flex items-center justify-between mb-6 bg-white p-4 rounded-2xl shadow-sm border border-stone-100">
           <div class="flex items-center space-x-3">
-            <i class="fa-solid fa-cloud-rain text-3xl text-blue-400"></i>
+            <i :class="weather.icon" class="text-3xl"></i>
             <div>
               <p class="text-sm text-text-light">香港特別行政區</p>
-              <p class="font-medium text-text-main">陣雨 / 濕熱</p>
+              <p class="font-medium text-text-main">{{ weather.desc }}</p>
             </div>
           </div>
           <div class="text-right">
-            <p class="text-2xl font-bold">26°C</p>
-            <p class="text-xs text-text-light">體感 28°C</p>
+            <p class="text-2xl font-bold">{{ weather.temp }}<span v-if="weather.temp !== '--'">°C</span></p>
+            <p class="text-xs text-text-light">體感 {{ weather.feelsLike }}<span v-if="weather.feelsLike !== '--'">°C</span></p>
           </div>
         </div>
 
@@ -743,8 +743,49 @@
           }
         };
 
+        // 天氣 (即時串接)
+        const weather = reactive({
+          temp: '--',
+          feelsLike: '--',
+          desc: '載入中...',
+          icon: 'fa-solid fa-spinner fa-spin text-stone-400'
+        });
+
+        const fetchWeather = async () => {
+          try {
+            // 香港經緯度：22.3193, 114.1694
+            const res = await fetch('https://api.open-meteo.com/v1/forecast?latitude=22.3193&longitude=114.1694&current=temperature_2m,apparent_temperature,weather_code&timezone=auto');
+            const data = await res.json();
+            if (data && data.current) {
+              weather.temp = Math.round(data.current.temperature_2m);
+              weather.feelsLike = Math.round(data.current.apparent_temperature);
+              
+              const code = data.current.weather_code;
+              // 依據 WMO 天氣代碼切換圖示與文字
+              if (code === 0) { 
+                weather.desc = '晴天'; weather.icon = 'fa-solid fa-sun text-orange-400'; 
+              } else if (code <= 3) { 
+                weather.desc = '多雲'; weather.icon = 'fa-solid fa-cloud text-gray-400'; 
+              } else if (code <= 48) { 
+                weather.desc = '有霧'; weather.icon = 'fa-solid fa-smog text-gray-400'; 
+              } else if (code <= 67 || (code >= 80 && code <= 82)) { 
+                weather.desc = '降雨'; weather.icon = 'fa-solid fa-cloud-rain text-blue-400'; 
+              } else if (code <= 77 || (code >= 85 && code <= 86)) { 
+                weather.desc = '下雪'; weather.icon = 'fa-solid fa-snowflake text-blue-200'; 
+              } else if (code >= 95) { 
+                weather.desc = '雷雨'; weather.icon = 'fa-solid fa-cloud-bolt text-purple-500'; 
+              }
+            }
+          } catch (err) {
+            console.error('天氣讀取失敗', err);
+            weather.desc = '無天氣資訊';
+            weather.icon = 'fa-solid fa-cloud text-gray-300';
+          }
+        };
+
         onMounted(() => {
           fetchExchangeRate();
+          fetchWeather(); // 進入頁面時自動抓取天氣
         });
 
         const totalExpenses = computed(() => expenses.reduce((sum, e) => sum + Number(e.amount), 0));
@@ -872,6 +913,7 @@
         return {
           activeTab, tabs, dates, selectedDate, currentItineraries, 
           mapFilter, filteredMapLocations, info, exchange, currentRate, isFetchingRate, calcExchange,
+          weather, fetchWeather,
           shoppingList, expenses, totalExpenses, modals, modalData, fabClick,
           getCategoryIcon, getTransportIcon, getExpenseIcon, openNavigation,
           openEditModal, saveItinerary, openShoppingEditModal, saveShopping, handleImageUpload,
