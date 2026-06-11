@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>大寶生日之旅❤️</title>
+  <title>我的香港行</title>
   
   <!-- Vue 3 -->
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
@@ -79,8 +79,9 @@
     <!-- 頁首 Banner 區域 -->
     <header class="relative w-full h-[250px]">
       
-      <!-- 預覽用的線上圖片。上傳 GitHub 時，請將 src 替換為 "IMAGE.png" -->
+      <!-- 已替換為您的 IMAGE.png -->
       <img src="IMAGE.png" alt="Banner" class="w-full h-full object-cover">
+      
       <div class="absolute inset-0 bg-gradient-to-b from-black/30 to-transparent"></div>
       
       <!-- 標題 -->
@@ -355,10 +356,65 @@
         </div>
       </section>
 
+      <!-- ================= 地圖/景點餐廳總覽 ================= -->
+      <section v-show="activeTab === 'map'" class="space-y-6">
+        <h2 class="text-xl font-bold mb-4 flex items-center"><i class="fa-solid fa-map-location-dot mr-2 text-primary"></i> 景點與美食地圖</h2>
+        
+        <!-- 嵌入式地圖 -->
+        <div class="w-full h-[250px] rounded-3xl overflow-hidden shadow-sm border border-stone-100 relative">
+          <iframe 
+            width="100%" 
+            height="100%" 
+            frameborder="0" 
+            scrolling="no" 
+            marginheight="0" 
+            marginwidth="0" 
+            src="https://maps.google.com/maps?q=香港&t=&z=11&ie=UTF8&iwloc=&output=embed">
+          </iframe>
+        </div>
+
+        <!-- 分類篩選列 -->
+        <div class="flex space-x-3 overflow-x-auto hide-scrollbar pb-2">
+          <button v-for="cat in ['全部', '景點', '美食', '購物']" :key="cat"
+                  @click="mapFilter = cat"
+                  class="px-5 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-colors border"
+                  :class="mapFilter === cat ? 'bg-primary text-white border-primary shadow-md' : 'bg-white text-text-light border-stone-200 hover:bg-cream-dark'">
+            {{ cat }}
+          </button>
+        </div>
+
+        <!-- 景點餐廳列表 (加入內部滾動機制，避免頁面過長) -->
+        <div class="space-y-4 max-h-[50vh] overflow-y-auto hide-scrollbar pb-6">
+          <div v-for="(loc, index) in filteredMapLocations" :key="index" class="bg-white p-4 rounded-3xl shadow-sm border border-stone-100 flex items-center justify-between">
+            <div class="flex items-center space-x-4 overflow-hidden pr-2">
+              <div class="w-12 h-12 shrink-0 rounded-full flex items-center justify-center bg-cream text-primary text-xl">
+                <i :class="getCategoryIcon(loc.type)"></i>
+              </div>
+              <div class="truncate">
+                <h3 class="font-bold text-md truncate">{{ loc.name }}</h3>
+                <div class="flex items-center mt-1 space-x-2">
+                  <span class="text-xs font-bold px-2 py-0.5 rounded inline-block"
+                        :class="{'bg-blue-50 text-blue-500': loc.type === '景點', 'bg-orange-50 text-orange-500': loc.type === '美食', 'bg-pink-50 text-pink-500': loc.type === '購物'}">
+                    {{ loc.type }}
+                  </span>
+                  <span v-if="loc.note" class="text-xs text-text-light truncate">{{ loc.note }}</span>
+                </div>
+              </div>
+            </div>
+            <button @click="openNavigation(loc.name)" class="shrink-0 w-10 h-10 rounded-full bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-colors">
+              <i class="fa-solid fa-location-arrow text-sm"></i>
+            </button>
+          </div>
+          <div v-if="filteredMapLocations.length === 0" class="text-center py-8 text-text-light">
+            <p>該分類目前沒有資料</p>
+          </div>
+        </div>
+      </section>
+
     </main>
 
     <!-- ================= 懸浮新增按鈕 (FAB) ================= -->
-    <button v-show="activeTab !== 'info'" @click="fabClick" class="fixed bottom-6 right-6 w-14 h-14 bg-primary text-white rounded-full shadow-[0_4px_15px_rgba(138,126,113,0.4)] flex items-center justify-center text-2xl hover:scale-105 transition-transform z-50">
+    <button v-show="!['info', 'map'].includes(activeTab)" @click="fabClick" class="fixed bottom-6 right-6 w-14 h-14 bg-primary text-white rounded-full shadow-[0_4px_15px_rgba(138,126,113,0.4)] flex items-center justify-center text-2xl hover:scale-105 transition-transform z-50">
       <i class="fa-solid fa-plus"></i>
     </button>
 
@@ -524,7 +580,8 @@
           { id: 'itinerary', icon: 'fa-regular fa-calendar-check' },
           { id: 'info', icon: 'fa-solid fa-circle-info' },
           { id: 'shopping', icon: 'fa-solid fa-basket-shopping' },
-          { id: 'expenses', icon: 'fa-solid fa-wallet' }
+          { id: 'expenses', icon: 'fa-solid fa-wallet' },
+          { id: 'map', icon: 'fa-solid fa-map-location-dot' }
         ];
 
         // 日期設定 (香港行 6/17 - 6/21)
@@ -567,6 +624,53 @@
         const currentItineraries = computed({
           get: () => allItineraries[selectedDate.value] || [],
           set: (val) => { allItineraries[selectedDate.value] = val; }
+        });
+
+        // NotebookLM 查詢的景點、美食、購物龐大資料庫
+        const notebookLocations = [
+          // 景點
+          { name: '香港迪士尼樂園', type: '景點' }, { name: '大館', type: '景點' }, { name: '星光大道', type: '景點' }, { name: '1881 Heritage', type: '景點' }, { name: '中環至半山自動扶手電梯', type: '景點' }, { name: '太平山頂纜車', type: '景點' }, { name: '天際100觀景台 (sky100)', type: '景點' }, { name: '張保仔號', type: '景點' }, { name: '天星小輪', type: '景點' }, { name: '落日飛車', type: '景點' }, { name: '叮叮車', type: '景點' }, { name: '尖沙咀鐘樓', type: '景點' }, { name: '幻彩詠香江', type: '景點' }, { name: '重慶大廈', type: '景點' }, { name: '九龍寨城公園', type: '景點' }, { name: '石硤尾美荷樓', type: '景點' }, { name: '杜莎夫人蠟像館', type: '景點' }, { name: '虎豹別墅', type: '景點' }, { name: '黃大仙廟', type: '景點' }, { name: '石板街', type: '景點' }, { name: '壁畫街 (中環)', type: '景點' }, { name: '玫瑰聖母堂 (澳門)', type: '景點' }, { name: '大三巴牌坊 (澳門)', type: '景點' }, { name: '威尼斯人 (澳門)', type: '景點' }, { name: '巴黎人 (澳門)', type: '景點' }, { name: '倫敦人 (澳門)', type: '景點' },
+          // 購物
+          { name: '女人街', type: '購物' }, { name: '波鞋街', type: '購物' }, { name: '金魚街', type: '購物' }, { name: '蘭桂坊', type: '購物' }, { name: '東薈城名店倉 (Citygate)', type: '購物' }, { name: '新世紀廣場 (MOKO)', type: '購物' }, { name: 'K11 MUSEA', type: '購物' }, { name: '現時點', note: '玩具、LEGO專賣', type: '購物' }, { name: '鴻興玩具', type: '購物' }, { name: 'Select 18', note: '中環古物店', type: '購物' }, { name: '祥興茶行', note: '伴手禮、咖啡豆', type: '購物' },
+          // 美食 - 冰室與茶餐廳
+          { name: '澳洲牛奶公司', type: '美食' }, { name: '華嫂冰室', type: '美食' }, { name: '紅茶冰室', type: '美食' }, { name: '金華冰廳', type: '美食' }, { name: '翠華餐廳', type: '美食' }, { name: '美都餐室', type: '美食' }, { name: '華星冰室', type: '美食' }, 
+          // 美食 - 港點與大排檔
+          { name: '一點心', type: '美食' }, { name: '蓮香樓', type: '美食' }, { name: '蓮香居', type: '美食' }, { name: '六安居', note: '傳統點心推車', type: '美食' }, { name: '喜煌點心', type: '美食' }, { name: '美心皇宮大會堂', type: '美食' }, { name: '愛文生大排檔', type: '美食' }, { name: '勝香園大排檔', type: '美食' }, { name: '棟記飯店', type: '美食' }, { name: '興記菜館', type: '美食' }, { name: '橋底辣蟹', type: '美食' }, { name: '嚐囍', type: '美食' }, { name: '樓上大排檔', type: '美食' }, { name: '女人街食飯公司', type: '美食' }, { name: '妹記大排檔', type: '美食' }, { name: '御希大排檔', type: '美食' }, { name: '陳根記', type: '美食' },
+          // 美食 - 燒臘與麵食
+          { name: '甘牌燒鵝', type: '美食' }, { name: '一樂燒鵝', type: '美食' }, { name: '榕哥陳皮燒鵝', type: '美食' }, { name: '棋子燒鵝', type: '美食' }, { name: '竺扶大班燒味', type: '美食' }, { name: '發達叉燒', type: '美食' }, { name: '龍邦燒味小廚茶餐廳', type: '美食' }, { name: '太興燒味', type: '美食' }, { name: '強記美食', note: '臘味糯米飯', type: '美食' }, { name: '九記牛腩', type: '美食' }, { name: '華姐清湯腩', type: '美食' }, { name: '沾仔記', note: '雲吞麵', type: '美食' }, { name: '麥文記麵家', type: '美食' }, { name: '生記粥品專家', type: '美食' }, { name: '何洪記', type: '美食' },
+          // 美食 - 甜點小吃與異國
+          { name: '祥興記上海生煎包', type: '美食' }, { name: '媽咪雞蛋仔', type: '美食' }, { name: '香港雞蛋仔', type: '美食' }, { name: '富豪雪糕車', type: '美食' }, { name: '瑞記咖啡', type: '美食' }, { name: '蘭芳園', type: '美食' }, { name: 'Bakehouse', note: '蛋撻', type: '美食' }, { name: '嘗琉珍 TART ADDICT', note: '杏仁酥與夏威夷果仁豆塔', type: '美食' }, { name: 'Vission Bakery', note: '爆漿抹茶麻糬丹麥酥', type: '美食' }, { name: 'Hashtag B', type: '美食' }, { name: '珍妮曲奇', type: '美食' }, { name: '佳佳甜品', note: '芝麻糊', type: '美食' }, { name: '義順牛奶公司', note: '雙皮燉奶', type: '美食' }, { name: '公和荳品廠', note: '豆腐花', type: '美食' }, { name: '暖心芝作', note: '黑芝麻卷', type: '美食' }, { name: '永吉街檸檬王', type: '美食' }, { name: 'milkfill', note: '拿破崙派', type: '美食' }, { name: 'HeSheEat', note: '牛角包冰淇淋', type: '美食' }, { name: 'Owl\'s Choux.Gelato.Coffee', note: '焦糖燉蛋泡芙', type: '美食' }, { name: '湊湊火鍋·茶憩', type: '美食' }, { name: '方叔叔重慶老火鍋', type: '美食' }, { name: 'Samsen 泰麵', type: '美食' }, { name: '泰排檔', type: '美食' }, { name: '鳥貴族', type: '美食' }, { name: 'CHEF STAGE BY EDDY CHU', type: '美食' }, { name: '六小館', note: '精緻中菜', type: '美食' }, { name: 'Shake Shack IFC', type: '美食' }, { name: 'Blue Bottle Coffee IFC', type: '美食' }, { name: 'Mister Donut', type: '美食' }, { name: 'Bibigo Bapsang', type: '美食' }, { name: 'Tiffany & Co. Blue Box Café', type: '美食' }
+        ];
+
+        const mapFilter = ref('全部');
+
+        // 整合 NotebookLM 龐大資料庫與行程內的自訂地點
+        const filteredMapLocations = computed(() => {
+          const itineraryLocations = [];
+          // 抓取行程表中自行新增的景點/美食/購物
+          Object.values(allItineraries).forEach(dayList => {
+            dayList.forEach(item => {
+              if (['景點', '美食', '購物'].includes(item.type)) {
+                itineraryLocations.push({ name: item.name, type: item.type, note: '行程安排' });
+              }
+            });
+          });
+
+          // 合併並利用 Set 去除重複名稱的地點
+          const allLocs = [...itineraryLocations, ...notebookLocations];
+          const uniqueLocs = [];
+          const seen = new Set();
+          allLocs.forEach(loc => {
+            if (!seen.has(loc.name)) {
+              seen.add(loc.name);
+              uniqueLocs.push(loc);
+            }
+          });
+
+          if (mapFilter.value === '全部') {
+            return uniqueLocs;
+          }
+          return uniqueLocs.filter(loc => loc.type === mapFilter.value);
         });
 
         // 資訊
@@ -719,7 +823,8 @@
         };
 
         return {
-          activeTab, tabs, dates, selectedDate, currentItineraries, info, exchange, calcExchange,
+          activeTab, tabs, dates, selectedDate, currentItineraries, 
+          mapFilter, filteredMapLocations, info, exchange, calcExchange,
           shoppingList, expenses, totalExpenses, modals, modalData, fabClick,
           getCategoryIcon, getTransportIcon, getExpenseIcon, openNavigation,
           openEditModal, saveItinerary, openShoppingEditModal, saveShopping, handleImageUpload,
